@@ -1,7 +1,6 @@
 use url::{Url};
 use github_rs::client::{Executor, Github};
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 use std::env;
 
 fn main() {
@@ -11,14 +10,10 @@ fn main() {
     let token = env::var("GITHUB_API_TOKEN").expect("not env GITHUB_API_TOKEN");
     // TODO コマンドライン引数から取得
     let pull_request_id = parse(&url).unwrap();
-    let pull = get_pull_request(&token, &pull_request_id);
+    let pull = PullRequest::new(&token, &pull_request_id);
 
     match pull {
-        Ok(pull) => {
-            if let Some(pull) = pull {
-                println!("{}", text(pull));
-            }
-        }
+        Ok(pull) => println!("{}", pull.summary()),
         Err(e) => println!("{}", e),
     }
 }
@@ -46,13 +41,6 @@ struct PullRequestID{
     id: String,
 }
 
-fn text(pull: PullRequest) -> String {
-    format!(
-        "{} (+{},-{}) changed files {}\n{}",
-        pull.title, pull.additions, pull.deletions, pull.changed_files, pull.html_url
-    )
-}
-
 #[derive(Serialize, Deserialize)]
 struct PullRequest {
     title: String,
@@ -62,18 +50,32 @@ struct PullRequest {
     changed_files: u32,
 }
 
-fn get_pull_request(
-    token: &str,
-    pull_request_id: &PullRequestID,
-) -> Result<Option<PullRequest>, Box<dyn Error>> {
-    let client = Github::new(token)?;
-    let (_, _, pull_request) = client
-        .get()
-        .repos()
-        .owner(&pull_request_id.owner)
-        .repo(&pull_request_id.repository)
-        .pulls()
-        .number(&pull_request_id.id)
-        .execute::<PullRequest>()?;
-    Ok(pull_request)
+impl PullRequest {
+    fn new(
+        token: &str,
+        pull_request_id: &PullRequestID,
+        // FIXME Errorオブジェクトをつくる
+    ) -> Result<PullRequest, String> {
+        let client = Github::new(token).map_err( |_| "not create github client")?;
+        let (_, _, pull_request) = client
+            .get()
+            .repos()
+            .owner(&pull_request_id.owner)
+            .repo(&pull_request_id.repository)
+            .pulls()
+            .number(&pull_request_id.id)
+            .execute::<PullRequest>().map_err(|_| "not get pull request")?;
+        if let Some(p) = pull_request {
+            Ok(p)
+        } else {
+            Err("no pull request".to_string())
+        }
+    }
+
+    fn summary(&self) -> String {
+        format!(
+            "{} (+{},-{}) changed files {}\n{}",
+            self.title, self.additions, self.deletions, self.changed_files, self.html_url
+        )
+    }
 }
