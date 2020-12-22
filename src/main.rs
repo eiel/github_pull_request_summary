@@ -1,44 +1,54 @@
-use url::{Url};
 use github_rs::client::{Executor, Github};
 use serde::{Deserialize, Serialize};
 use std::env;
+use url::Url;
 
 fn main() {
     let mut args = env::args();
     args.next();
     let url = args.next().expect("not 1st arg");
     let token = env::var("GITHUB_API_TOKEN").expect("not env GITHUB_API_TOKEN");
-    // TODO コマンドライン引数から取得
-    let pull_request_id = parse(&url).unwrap();
+    let pull_request_id = PullRequestID::parse(&url).unwrap();
     let pull = PullRequest::new(&token, &pull_request_id);
 
     match pull {
         Ok(pull) => println!("{}", pull.summary()),
+        // FIXME 標準エラーへ出力する
         Err(e) => println!("{}", e),
     }
 }
 
-fn parse(url: &str) -> Result<PullRequestID, String> {
-    let pull_url = Url::parse(url).map_err( |_e| format!("invalid url:  {}", url))?;
-    let mut paths = pull_url.path_segments().ok_or("url pull request parse error")?;
-    let owner: &str = paths.next().ok_or("non owner: pull request url")?;
-    let repository: &str = paths.next().ok_or("non repository: pull request url")?;
-    let pull = paths.next().ok_or("non pull path: pull request url")?;
-    if !pull.eq("pull") {
-        return Err("non pull request url".to_owned());
-    }
-    let id: &str = paths.next().ok_or("non pull request id: pull request url")?;
-    Ok(PullRequestID{
-        owner: owner.to_owned(),
-        repository: repository.to_owned(),
-        id: id.to_owned(),
-    })
-}
-
-struct PullRequestID{
+struct PullRequestID {
     owner: String,
     repository: String,
     id: String,
+}
+
+impl PullRequestID {
+    /**
+     * URL形式の文字列を解析しPull Request の ID を取り出す
+     * FIXME Errorの型を用意する
+     */
+    fn parse(url: &str) -> Result<PullRequestID, String> {
+        let pull_url = Url::parse(url).map_err(|_e| format!("invalid url:  {}", url))?;
+        let mut paths = pull_url
+            .path_segments()
+            .ok_or("url pull request parse error")?;
+        let owner: &str = paths.next().ok_or("non owner: pull request url")?;
+        let repository: &str = paths.next().ok_or("non repository: pull request url")?;
+        let pull = paths.next().ok_or("non pull path: pull request url")?;
+        if !pull.eq("pull") {
+            return Err("non pull request url".to_owned());
+        }
+        let id: &str = paths
+            .next()
+            .ok_or("non pull request id: pull request url")?;
+        Ok(PullRequestID {
+            owner: owner.to_owned(),
+            repository: repository.to_owned(),
+            id: id.to_owned(),
+        })
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -56,7 +66,7 @@ impl PullRequest {
         pull_request_id: &PullRequestID,
         // FIXME Errorオブジェクトをつくる
     ) -> Result<PullRequest, String> {
-        let client = Github::new(token).map_err( |_| "not create github client")?;
+        let client = Github::new(token).map_err(|_| "not create github client")?;
         let (_, _, pull_request) = client
             .get()
             .repos()
@@ -64,7 +74,8 @@ impl PullRequest {
             .repo(&pull_request_id.repository)
             .pulls()
             .number(&pull_request_id.id)
-            .execute::<PullRequest>().map_err(|_| "not get pull request")?;
+            .execute::<PullRequest>()
+            .map_err(|_| "not get pull request")?;
         if let Some(p) = pull_request {
             Ok(p)
         } else {
@@ -72,6 +83,9 @@ impl PullRequest {
         }
     }
 
+    /**
+      * 画面へ出力する文字列を生成する
+      */
     fn summary(&self) -> String {
         format!(
             "{} (+{},-{}) changed files {}\n{}",
