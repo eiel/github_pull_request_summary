@@ -1,6 +1,7 @@
 use github_rs::client::{Executor, Github};
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::process;
 use url::Url;
 
 fn main() {
@@ -8,13 +9,22 @@ fn main() {
     args.next();
     let url = args.next().expect("not 1st arg");
     let token = env::var("GITHUB_API_TOKEN").expect("not env GITHUB_API_TOKEN");
-    let pull_request_id = PullRequestID::parse(&url).unwrap();
-    let pull = PullRequest::new(&token, &pull_request_id);
+    let pull_request_id = match PullRequestID::parse(&url) {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("{}", e);
+            process::exit(1);
+        }
 
-    match pull {
+    };
+    let pull_request = PullRequest::new(&token, &pull_request_id);
+
+    match pull_request {
         Ok(pull) => println!("{}", pull.summary()),
-        // FIXME 標準エラーへ出力する
-        Err(e) => println!("{}", e),
+        Err(e) => {
+            eprintln!("{}", e);
+            process::exit(1);
+        }
     }
 }
 
@@ -51,7 +61,7 @@ impl PullRequestID {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct PullRequest {
     title: String,
     html_url: String,
