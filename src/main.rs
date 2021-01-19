@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::fmt;
 use std::process;
+use std::str::FromStr;
 use url::Url;
 
 fn main() {
@@ -10,7 +11,8 @@ fn main() {
     args.next();
     let url = args.next().expect("not 1st arg");
     let token = env::var("GITHUB_API_TOKEN").expect("not env GITHUB_API_TOKEN");
-    let pull_request_id = match PullRequestID::parse(&url) {
+
+    let pull_request_id = match PullRequestID::from_str(&url) {
         Ok(id) => id,
         Err(e) => {
             eprintln!("{}", e);
@@ -18,8 +20,9 @@ fn main() {
         }
 
     };
-    let pull_request = PullRequestSummary::new(&token, &pull_request_id);
+    let client = Github::new(token).expect("not create github client");
 
+    let pull_request = PullRequestSummary::new(&client, &pull_request_id);
     match pull_request {
         Ok(pull) => println!("{}", pull),
         Err(e) => {
@@ -35,12 +38,13 @@ struct PullRequestID {
     id: String,
 }
 
-impl PullRequestID {
+impl FromStr for PullRequestID {
+    type Err = String;
     /**
      * URL形式の文字列を解析しPull Request の ID を取り出す
      * FIXME Errorの型を用意する
      */
-    fn parse(url: &str) -> Result<PullRequestID, String> {
+    fn from_str(url: &str) -> Result<PullRequestID, String> {
         let pull_url = Url::parse(url).map_err(|_e| format!("invalid url:  {}", url))?;
         let mut paths = pull_url
             .path_segments()
@@ -73,11 +77,10 @@ struct PullRequestSummary {
 
 impl PullRequestSummary {
     fn new(
-        token: &str,
+        client: &Github,
         pull_request_id: &PullRequestID,
         // FIXME Errorオブジェクトをつくる
     ) -> Result<PullRequestSummary, String> {
-        let client = Github::new(token).map_err(|_| "not create github client")?;
         let (_, _, pull_request) = client
             .get()
             .repos()
