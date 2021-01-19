@@ -6,13 +6,10 @@ use std::process;
 use std::str::FromStr;
 use url::Url;
 
-fn main() {
-    let mut args = env::args();
-    args.next();
-    let url = args.next().expect("not 1st arg");
+#[argopt::cmd]
+fn main(pull_request_url: String) {
     let token = env::var("GITHUB_API_TOKEN").expect("not env GITHUB_API_TOKEN");
-
-    let pull_request_id = match PullRequestID::from_str(&url) {
+    let pull_request_id = match PullRequestID::from_str(&pull_request_url) {
         Ok(id) => id,
         Err(e) => {
             eprintln!("{}", e);
