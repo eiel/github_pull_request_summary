@@ -1,6 +1,7 @@
 use github_rs::client::{Executor, Github};
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::fmt;
 use std::process;
 use url::Url;
 
@@ -17,10 +18,10 @@ fn main() {
         }
 
     };
-    let pull_request = PullRequest::new(&token, &pull_request_id);
+    let pull_request = PullRequestSummary::new(&token, &pull_request_id);
 
     match pull_request {
-        Ok(pull) => println!("{}", pull.summary()),
+        Ok(pull) => println!("{}", pull),
         Err(e) => {
             eprintln!("{}", e);
             process::exit(1);
@@ -62,7 +63,7 @@ impl PullRequestID {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct PullRequest {
+struct PullRequestSummary {
     title: String,
     html_url: String,
     additions: u32,
@@ -70,12 +71,12 @@ struct PullRequest {
     changed_files: u32,
 }
 
-impl PullRequest {
+impl PullRequestSummary {
     fn new(
         token: &str,
         pull_request_id: &PullRequestID,
         // FIXME Errorオブジェクトをつくる
-    ) -> Result<PullRequest, String> {
+    ) -> Result<PullRequestSummary, String> {
         let client = Github::new(token).map_err(|_| "not create github client")?;
         let (_, _, pull_request) = client
             .get()
@@ -84,7 +85,7 @@ impl PullRequest {
             .repo(&pull_request_id.repository)
             .pulls()
             .number(&pull_request_id.id)
-            .execute::<PullRequest>()
+            .execute::<PullRequestSummary>()
             .map_err(|_| "not get pull request")?;
         if let Some(p) = pull_request {
             Ok(p)
@@ -92,12 +93,12 @@ impl PullRequest {
             Err("no pull request".to_string())
         }
     }
+}
 
-    /**
-      * 画面へ出力する文字列を生成する
-      */
-    fn summary(&self) -> String {
-        format!(
+
+impl fmt::Display for PullRequestSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f,
             "{} (+{},-{}) changed files {}\n{}",
             self.title, self.additions, self.deletions, self.changed_files, self.html_url
         )
