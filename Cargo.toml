@@ -1,6 +1,6 @@
 [package]
 name = "github_pull_request_summary"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Tomohiko Himura <eiel.hal@gmail.com>"]
 edition = "2018"
 
@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 argopt = "0.1"
 github-rs = "0.7"
-url = "2.1"
+url = "2.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 structopt = "0.3"
